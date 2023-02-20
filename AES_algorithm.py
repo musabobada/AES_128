@@ -91,7 +91,7 @@ def plainStringToHexStateMatrix(string):
         for j in range(4):
             stateMatrix[j][i] = hex(ord(string[i*4+j]))[2:].zfill(2)
     return stateMatrix
-def stateMatrixToString(stateMatrixHex):
+def hexStateMatrixToPlainString(stateMatrixHex):
 # converts state matrix to a string
 # ? EXAMPLE: "0x41" character become => "A"
     string = ""
@@ -176,20 +176,92 @@ def inverseSubWord(word):
         #  words+=hex(sBoxInverse(row,column))[2:].zfill(8)
     return words
 ################   MATRIX   
-def matrixMult(m1,m2):
+def gf_mult(a, b):
+    # print(a,b)
+    # Check if inputs are within the field
+    if int(a, 16) >= 0x100 or int(b, 16) >= 0x100:
+        raise ValueError("Inputs must be less than 0x100.")
+    # Convert hex inputs to binary strings
+    a_bin = bin(int(a, 16))[2:].zfill(8)
+    b_bin = bin(int(b, 16))[2:].zfill(8)
+    # Initialize result as 0
+    result = 0
+    # Multiply polynomials modulo m(x)
+    for i in range(8):
+        if b_bin[-1] == '1':
+            result ^= int(a_bin, 2)
+        a_bin = a_bin[1:] + '0'
+        if int(a_bin[0]) == 1:
+            a_bin = bin(int(a_bin, 2) ^ int('1b', 16))[2:].zfill(8)
+        b_bin = b_bin[:-1]
+    # Convert result to hex string
+    result=hex(result)[2:].zfill(2)
+    print()
+    
+    print("----")
+    print(f"{a} * {b} = {result}")
+    return result
+
+def splitMatrixToColumns(matrix):
+    matrices=[]
+    for i in range(len(matrix[0])):
+        tempMatrix=[0 for i in range(len(matrix))]
+        for j in range(len(matrix)):
+            tempMatrix[j]=matrix[j][i]
+        matrices.append(tempMatrix)
+    return matrices
+    # return matrix
+def columnMatricesTo1Matrix(matrices):
+    matrix=[[0 for _ in range(len(matrices))] for _ in range(len(matrices[0]))]
+    for i in range(len(matrices[0])):
+        for j in range(len(matrices)):
+            matrix[i][j]=matrices[j][i]
+    return matrix
+def hexFullMatrixMult(m1,m2):
     if(len(m2)!=len(m1[0])):
-        print("nooo")
+        print("matrices can't be mutiplied because of dimension")
         return
     x=range(len(m1))
     y=range(len(m2[0]))
     z=range(len(m2))
-    arr=[[0 for _ in y ] for _ in x]
+    arr=[[0 for _ in y] for _ in x]
     for i in x:
         for j in y:
             sum=0
             for k in z:
-                    sum+=m1[i][k]*m2[k][j]
-            arr[i][j]=sum
+                # print(gf_mult(m1[i][k],m2[k][j]))
+                sum^=int(gf_mult(m1[i][k],m2[k][j]),16)
+            arr[i][j]=hex(sum)[2:].zfill(2)
+    return arr
+def hexMatrixColumnMult(m1,m2):
+    if(len(m2)!=len(m1[0])):
+        print("matrices can't be mutiplied because of dimension")
+        return
+    x=range(len(m1))
+    y=range(len(m2[0]))
+    z=range(len(m2))
+    arr=[[0 for _ in y] for _ in x]
+    for i in x:
+        for j in y:
+            sum=0
+            for k in z:
+                sum^=int(gf_mult(m1[i][k],m2[k]),16)
+            arr[i]=hex(sum)[2:].zfill(2)
+    return arr
+def hexMatrixOrdinariyMult(m1,m2):
+    if(len(m2)!=len(m1[0])):
+        print("matrices can't be mutiplied because of dimension")
+        return
+    x=range(len(m1))
+    y=range(len(m2[0]))
+    z=range(len(m2))
+    arr=[[0 for _ in y] for _ in x]
+    for i in x:
+        for j in y:
+            sum=0
+            for k in z:
+                sum+=int(m1[i][k],16)*int(m2[k][j],16)
+            arr[i][j]=hex(sum)[2:].zfill(2)
     return arr
 def shiftRows(matrix):
 # shift rows of matrix according to AES Standards 
@@ -214,6 +286,32 @@ def inverseShiftRows(matrix):
         for j in range(4):
             tempMatrix[i][j]=matrix[i][(j-i)%4]
     return tempMatrix
+def matrixColumnMix(matrix):
+    mixArray=[
+    ["02","03","01","01"],
+    ["01","02","03","01"],
+    ["01","01","02","03"],
+    ["03","01","01","02"]
+    ]
+    matrices=splitMatrixToColumns(matrix)
+    tempMatrices=[]
+    for i in range(len(matrices)):
+        tempMatrices.append(hexMatrixColumnMult(mixArray,matrices[i]))
+    # print(tempMatrices)
+    # print("---")
+    return columnMatricesTo1Matrix(tempMatrices)
+def matrixInverseColumnMix(matrix):
+    mixArray=[
+    ["0e","0b","0d","09"],
+    ["09","0e","0b","0d"],
+    ["0d","09","0e","0b"],
+    ["0b","0d","09","0e"]
+    ]
+    matrices=splitMatrixToColumns(matrix)
+    tempMatrices=[]
+    for i in range(len(matrices)):
+        tempMatrices.append(hexMatrixColumnMult(mixArray,matrices[i]))
+    return columnMatricesTo1Matrix(tempMatrices)
 def matrixInverseSub(matrix):
 # return inverse s-box values for state matrix 
     for i in range(4):
@@ -231,12 +329,7 @@ def matrixInverseSub(matrix):
 key="i love python3.9"
 testMessage = "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ"
 message=testMessage[:16]
-mixArray=[
-    [0x02,0x03,0x01,0x01],
-    [0x01,0x02,0x03,0x01],
-    [0x01,0x01,0x02,0x03],
-    [0x03,0x01,0x01,0x02]
-    ]
+
 ########## AES ENCRYPTION
 def AES_Encrypt(plainText,key):
     message=plainText
@@ -248,6 +341,12 @@ def AES_Encrypt(plainText,key):
         stateMatrix=hexStringToHexStateMatrix(message)
         stateMatrix=matrixSub(stateMatrix)
         stateMatrix=shiftRows(stateMatrix)
+        if(i==10):
+            message=hexStateMatrixToHexString(stateMatrix)
+            message=hexStringToIntNumber(message)
+            message=hex(message^keys[i])[2:].zfill(32)
+            continue
+        # stateMatrix=matrixColumnMix(stateMatrix)
         message=hexStateMatrixToHexString(stateMatrix)
         message=hexStringToIntNumber(message)
         message=hex(message^keys[i])[2:].zfill(32)
@@ -255,19 +354,21 @@ def AES_Encrypt(plainText,key):
 ########## AES DECRYPTION
 def AES_Decrypt(cipherHexText,key):
     message=cipherHexText
-    # print(message)
     keys=keyExpansion(key)
     message=hexStringToIntNumber(message)
     message=hex(message^keys[10])[2:].zfill(32)   
+    stateMatrix=hexStringToHexStateMatrix(message)
     for i in range(9,-1,-1):
-        stateMatrix=hexStringToHexStateMatrix(message)
         stateMatrix=inverseShiftRows(stateMatrix)
         stateMatrix=matrixInverseSub(stateMatrix)
         message=hexStateMatrixToHexString(stateMatrix)
-        # print(message)
         message=hexStringToIntNumber(message)
         message=message^keys[i]
         message=hex(message)[2:].zfill(32)
+        stateMatrix=hexStringToHexStateMatrix(message)
+        if(i==0):
+            continue
+        # stateMatrix=matrixInverseColumnMix(stateMatrix)
     message=splitString(message,2)
     plainText=""
     for i in message:
@@ -293,11 +394,32 @@ def main_Dec(cipherText,key):
     for i in cipherTexts:
         plainText+=AES_Decrypt(i,key)
     return "plainText : " +plainText
-
-message=input("Enter message to be encrypted \n>>>")
-key=input("Enter key  (16-Bit long)\n>>>")
-print(main_Enc(message,key))
-cipherText=input("\nEnter message to be decrypted \n>>>")
-print(main_Dec(cipherText,key))
-# print(AES_Encrypt(message,key))
+def main():
+    message=input("Enter message to be encrypted \n>>>")
+    key=input("Enter key  (16-Bit long)\n>>>")
+    print(main_Enc(message,key))
+    cipherText=input("\nEnter message to be decrypted \n>>>")
+    print(main_Dec(cipherText,key))
+# main()
+# AES_Encrypt(message,key)
 # print(AES_Decrypt("ca321a6eda7ae1e22026f7e42283e5a9",key))
+# m1=plainStringToHexStateMatrix(testMessage[:16])
+# m2=plainStringToHexStateMatrix(testMessage[16:32])
+# printArray(m1)
+# print("-"*20)
+# printArray(m2)
+# print("-"*20)
+# printArray(hexMatrixColumnMult(m1,m2))
+# print("-"*20)
+
+m1=[
+    ["95","90","89","c3"],
+    ["65","fb","67","c9"],
+    ["fd","b1","a7","6e"],
+    ["f3","92","70","ff"]
+    ]
+printArray(m1)
+print()
+m2=matrixColumnMix(m1)
+# printArray(m1)
+# printArray(matrixInverseColumnMix(m2))

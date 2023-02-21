@@ -47,7 +47,7 @@ def sBoxInverse(row,column):
     [0xA0, 0xE0, 0x3B, 0x4D, 0xAE, 0x2A, 0xF5, 0xB0, 0xC8, 0xEB, 0xBB, 0x3C, 0x83, 0x53, 0x99, 0x61],
     [0x17, 0x2B, 0x04, 0x7E, 0xBA, 0x77, 0xD6, 0x26, 0xE1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0C, 0x7D]]
     return sBoxInverse[row][column]
-########## STRING,MAATRIX CONVERTION 
+########## STRING - MAATRIX CONVERTION 
 def hexStringToHexStateMatrix(hexString):
 # converts a block (16 bytes) of string into form of 4x4 matrix 
 # each string character converted to ASCII value then
@@ -66,38 +66,6 @@ def hexStateMatrixToHexString(stateMatrixHex):
     for i in range(4):
         for j in range(4):
             string+=stateMatrixHex[j][i]
-    return string
-def hexStateMatrixToIntNumber(stateMatrixHex):
-    string = ""
-    for i in range(4):
-        for j in range(4):
-            string+=stateMatrixHex[j][i]
-    return int(string,16)
-def matrixToWords(arr):
-    words=[0,0,0,0]
-    for i in range(4):
-        word=""
-        for j in range(4):
-            word+=arr[j][i]
-        words[i]=word
-    return words
-def plainStringToHexStateMatrix(string):
-# converts a block (16 bytes) of string into form of 4x4 matrix 
-# each string character converted to ASCII value then
-# converted into form of hex value 
-# ? EXAMPLE: "A" character become => "0x41"
-    stateMatrix = [["0" for _ in range(4)] for _ in range(4)]
-    for i in range(4):
-        for j in range(4):
-            stateMatrix[j][i] = hex(ord(string[i*4+j]))[2:].zfill(2)
-    return stateMatrix
-def hexStateMatrixToPlainString(stateMatrixHex):
-# converts state matrix to a string
-# ? EXAMPLE: "0x41" character become => "A"
-    string = ""
-    for i in range(4):
-        for j in range(4):
-            string+=chr(int(stateMatrixHex[j][i],16))
     return string
 ##########  STRING CONVERTION  
 def splitInToBlocks(message):
@@ -136,133 +104,32 @@ def subWord(word):
     for i in range(4):
         row=int(bytes[i][0],16)
         column=int(bytes[i][1],16)
-        # ! zfill bellow
-        words+=hex(sBox(row,column))[2:]
+        words+=hex(sBox(row,column))[2:].zfill(2)
     return words
 def keyExpansion(key):
-    hexKey=""
-    for i in range(len(key)):
-        hexKey+=hex(ord(key[i]))[2:].zfill(2)
-    keyWords=splitString(hexKey,8)
+    key=plainStringToHexString(key)
+    keyWords=splitString(key,8)
     rc=[0x01000000, 0x02000000, 0x04000000, 0x08000000, 0x10000000, 0x20000000, 0x40000000, 0x80000000, 0x1B000000, 0x36000000]
-    intWords=[0 for i in range(44)]
+    words=[0 for i in range(44)]
     for i in range(4):
-        intWords[i]=int(keyWords[i],16)
+        words[i]=keyWords[i]
     for i in range(4,44):
+        temp=words[i-1]
         if (i%4==0):
-            # ! zfill bellow
-            intWords[i]=rc[(i//4)-1]^int(subWord(rotWord(hex(intWords[i-4])[2:].zfill(8))),16)
-            continue
-        intWords[i]=intWords[i-1]^intWords[i-4]
+            temp=hex(rc[((i//4)-1)]^int(subWord(rotWord(words[i-1])),16))[2:].zfill(8)
+        words[i]=hex(int(temp,16)^int(words[i-4],16))[2:].zfill(8)
     keys=[0 for _ in range(11)]
     for i in range(0,44,4):
-        # ! zfill bellow
-        keys[i//4]=int(hex(intWords[i])[2:].zfill(8)+hex(intWords[i+1])[2:].zfill(8)+hex(intWords[i+2])[2:].zfill(8)+hex(intWords[i+3])[2:].zfill(8),16)
-    # return words,keys,len(keys[0])//2
-    return keys
-def inverseRotWord(word):
-    words=""
-    for i in range(8):
-        words+=word[(i-2)%8]
-    return words
-def inverseSubWord(word):
-    words=""
-    bytes=splitString(word,2)
-    for i in range(4):
-        row=int(bytes[i][0],16)
-        column=int(bytes[i][1],16)
-        #! zfill bellow
-        words+=hex(sBoxInverse(row,column))[2:]
-        #  words+=hex(sBoxInverse(row,column))[2:].zfill(8)
-    return words
-################   MATRIX   
-def gf_mult(a, b):
-    # print(a,b)
-    # Check if inputs are within the field
-    if int(a, 16) >= 0x100 or int(b, 16) >= 0x100:
-        raise ValueError("Inputs must be less than 0x100.")
-    # Convert hex inputs to binary strings
-    a_bin = bin(int(a, 16))[2:].zfill(8)
-    b_bin = bin(int(b, 16))[2:].zfill(8)
-    # Initialize result as 0
-    result = 0
-    # Multiply polynomials modulo m(x)
-    for i in range(8):
-        if b_bin[-1] == '1':
-            result ^= int(a_bin, 2)
-        a_bin = a_bin[1:] + '0'
-        if int(a_bin[0]) == 1:
-            a_bin = bin(int(a_bin, 2) ^ int('1b', 16))[2:].zfill(8)
-        b_bin = b_bin[:-1]
-    # Convert result to hex string
-    result=hex(result)[2:].zfill(2)
-    print()
-    
-    print("----")
-    print(f"{a} * {b} = {result}")
-    return result
-
-def splitMatrixToColumns(matrix):
-    matrices=[]
-    for i in range(len(matrix[0])):
-        tempMatrix=[0 for i in range(len(matrix))]
-        for j in range(len(matrix)):
-            tempMatrix[j]=matrix[j][i]
-        matrices.append(tempMatrix)
-    return matrices
-    # return matrix
-def columnMatricesTo1Matrix(matrices):
-    matrix=[[0 for _ in range(len(matrices))] for _ in range(len(matrices[0]))]
-    for i in range(len(matrices[0])):
-        for j in range(len(matrices)):
-            matrix[i][j]=matrices[j][i]
-    return matrix
-def hexFullMatrixMult(m1,m2):
-    if(len(m2)!=len(m1[0])):
-        print("matrices can't be mutiplied because of dimension")
-        return
-    x=range(len(m1))
-    y=range(len(m2[0]))
-    z=range(len(m2))
-    arr=[[0 for _ in y] for _ in x]
-    for i in x:
-        for j in y:
-            sum=0
-            for k in z:
-                # print(gf_mult(m1[i][k],m2[k][j]))
-                sum^=int(gf_mult(m1[i][k],m2[k][j]),16)
-            arr[i][j]=hex(sum)[2:].zfill(2)
-    return arr
-def hexMatrixColumnMult(m1,m2):
-    if(len(m2)!=len(m1[0])):
-        print("matrices can't be mutiplied because of dimension")
-        return
-    x=range(len(m1))
-    y=range(len(m2[0]))
-    z=range(len(m2))
-    arr=[[0 for _ in y] for _ in x]
-    for i in x:
-        for j in y:
-            sum=0
-            for k in z:
-                sum^=int(gf_mult(m1[i][k],m2[k]),16)
-            arr[i]=hex(sum)[2:].zfill(2)
-    return arr
-def hexMatrixOrdinariyMult(m1,m2):
-    if(len(m2)!=len(m1[0])):
-        print("matrices can't be mutiplied because of dimension")
-        return
-    x=range(len(m1))
-    y=range(len(m2[0]))
-    z=range(len(m2))
-    arr=[[0 for _ in y] for _ in x]
-    for i in x:
-        for j in y:
-            sum=0
-            for k in z:
-                sum+=int(m1[i][k],16)*int(m2[k][j],16)
-            arr[i][j]=hex(sum)[2:].zfill(2)
-    return arr
+        keys[i//4]=words[i]+words[i+1]+words[i+2]+words[i+3]
+    return keys################   MATRIX       
+def gf8_multiplication(a, b):
+    byte1=int(a,16)
+    byte2=int(b,16)
+    if byte1==3:
+        return byte2^((byte2<<1)&255)^(0x1b if byte2&128 else 0)
+    if byte1==2:
+        return ((byte2<<1)&255)^(0x1b if byte2&128 else 0)
+    return byte2
 def shiftRows(matrix):
 # shift rows of matrix according to AES Standards 
     tempMatrix=[i[:] for i in matrix]
@@ -293,13 +160,13 @@ def matrixColumnMix(matrix):
     ["01","01","02","03"],
     ["03","01","01","02"]
     ]
-    matrices=splitMatrixToColumns(matrix)
-    tempMatrices=[]
-    for i in range(len(matrices)):
-        tempMatrices.append(hexMatrixColumnMult(mixArray,matrices[i]))
-    # print(tempMatrices)
-    # print("---")
-    return columnMatricesTo1Matrix(tempMatrices)
+    tempMatrix=[[0 for _ in range(4)] for _ in range(4)]
+    for i in range(4):
+        for j in range(4):
+            for k in range(4):
+                tempMatrix[j][i]^=gf8_multiplication(mixArray[j][k],matrix[k][i])
+            tempMatrix[j][i]=hex(tempMatrix[j][i])[2:].zfill(2)
+    return tempMatrix
 def matrixInverseColumnMix(matrix):
     mixArray=[
     ["0e","0b","0d","09"],
@@ -307,11 +174,13 @@ def matrixInverseColumnMix(matrix):
     ["0d","09","0e","0b"],
     ["0b","0d","09","0e"]
     ]
-    matrices=splitMatrixToColumns(matrix)
-    tempMatrices=[]
-    for i in range(len(matrices)):
-        tempMatrices.append(hexMatrixColumnMult(mixArray,matrices[i]))
-    return columnMatricesTo1Matrix(tempMatrices)
+    tempMatrix=[[0 for _ in range(4)] for _ in range(4)]
+    for i in range(4):
+        for j in range(4):
+            for k in range(4):
+                tempMatrix[j][i]^=gf8_multiplication(mixArray[j][k],matrix[k][i])
+            tempMatrix[j][i]=hex(tempMatrix[j][i])[2:].zfill(2)
+    return tempMatrix
 def matrixInverseSub(matrix):
 # return inverse s-box values for state matrix 
     for i in range(4):
@@ -320,23 +189,14 @@ def matrixInverseSub(matrix):
             column=int(matrix[i][j][1],16)
             matrix[i][j]=hex(sBoxInverse(row,column))[2:].zfill(2)
     return matrix
-
 #############################################
 ###########  MAIN AES FUNCTION  #############
 #############################################
-
-########## ? TESTING ###########
-key="i love python3.9"
-testMessage = "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ"
-message=testMessage[:16]
-
-########## AES ENCRYPTION
 def AES_Encrypt(plainText,key):
-    message=plainText
+    message=plainStringToHexString(plainText)
     keys=keyExpansion(key)
-    message=plainStringToHexString(message)
     message=hexStringToIntNumber(message)
-    message=hex(message^keys[0])[2:].zfill(32)
+    message=hex(message^int(keys[0],16))[2:].zfill(32)
     for i in range(1,11):
         stateMatrix=hexStringToHexStateMatrix(message)
         stateMatrix=matrixSub(stateMatrix)
@@ -344,38 +204,39 @@ def AES_Encrypt(plainText,key):
         if(i==10):
             message=hexStateMatrixToHexString(stateMatrix)
             message=hexStringToIntNumber(message)
-            message=hex(message^keys[i])[2:].zfill(32)
+            message=hex(message^int(keys[i],16))[2:].zfill(32)
             continue
-        # stateMatrix=matrixColumnMix(stateMatrix)
+        stateMatrix=matrixColumnMix(stateMatrix)
         message=hexStateMatrixToHexString(stateMatrix)
         message=hexStringToIntNumber(message)
-        message=hex(message^keys[i])[2:].zfill(32)
+        message=hex(message^int(keys[i],16))[2:].zfill(32)
     return message
-########## AES DECRYPTION
+# ! Decryption IS NOT Working
 def AES_Decrypt(cipherHexText,key):
     message=cipherHexText
     keys=keyExpansion(key)
+    print(message)
+    print(message)
     message=hexStringToIntNumber(message)
-    message=hex(message^keys[10])[2:].zfill(32)   
+    print(message)
+    message=hex(message^int(keys[10],16))[2:].zfill(32)   
     stateMatrix=hexStringToHexStateMatrix(message)
     for i in range(9,-1,-1):
         stateMatrix=inverseShiftRows(stateMatrix)
         stateMatrix=matrixInverseSub(stateMatrix)
         message=hexStateMatrixToHexString(stateMatrix)
         message=hexStringToIntNumber(message)
-        message=message^keys[i]
+        message=message^int(keys[i],16)
         message=hex(message)[2:].zfill(32)
         stateMatrix=hexStringToHexStateMatrix(message)
         if(i==0):
             continue
-        # stateMatrix=matrixInverseColumnMix(stateMatrix)
+        stateMatrix=matrixInverseColumnMix(stateMatrix)
     message=splitString(message,2)
     plainText=""
     for i in message:
         plainText+=chr(int(i,16))
     return plainText
-
-########## INPUT
 def main_Enc(message,key):
     if(len(key)!=16):
         print("key lenght is not 16-Bit long")
@@ -384,7 +245,9 @@ def main_Enc(message,key):
     cipherText=""
     for i in messages:
         cipherText+=AES_Encrypt(i,key)
-    return "cipherText : " +cipherText
+    print("\nplainText :"+message+"\nkey : "+key+"\ncipherText : " +cipherText)
+    return cipherText
+# ! Decryption IS NOT Working
 def main_Dec(cipherText,key):
     if(len(key)!=16):
         print("key lenght is not 16-Bit long")
@@ -393,33 +256,16 @@ def main_Dec(cipherText,key):
     plainText=""
     for i in cipherTexts:
         plainText+=AES_Decrypt(i,key)
-    return "plainText : " +plainText
-def main():
-    message=input("Enter message to be encrypted \n>>>")
-    key=input("Enter key  (16-Bit long)\n>>>")
-    print(main_Enc(message,key))
-    cipherText=input("\nEnter message to be decrypted \n>>>")
-    print(main_Dec(cipherText,key))
-# main()
-# AES_Encrypt(message,key)
-# print(AES_Decrypt("ca321a6eda7ae1e22026f7e42283e5a9",key))
-# m1=plainStringToHexStateMatrix(testMessage[:16])
-# m2=plainStringToHexStateMatrix(testMessage[16:32])
-# printArray(m1)
-# print("-"*20)
-# printArray(m2)
-# print("-"*20)
-# printArray(hexMatrixColumnMult(m1,m2))
-# print("-"*20)
+    print("plainText : " +plainText)
+    return plainText
 
-m1=[
-    ["95","90","89","c3"],
-    ["65","fb","67","c9"],
-    ["fd","b1","a7","6e"],
-    ["f3","92","70","ff"]
-    ]
-printArray(m1)
-print()
-m2=matrixColumnMix(m1)
-# printArray(m1)
-# printArray(matrixInverseColumnMix(m2))
+########## ? TESTING
+key="i love python3.9"
+testMessage = "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ"
+message=testMessage[:16]
+########## INPUT
+message=input("Enter message to be encrypted \n>>>")
+key=input("Enter key  (16-Bit long)\n>>>")
+main_Enc(message,key)
+# cipher text for "ABCDEFGHIJKLMNOP" is :
+# cipher text : a1d809a36dad0c2e02e8ee4a01971921
